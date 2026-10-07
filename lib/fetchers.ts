@@ -4,6 +4,9 @@ import net from "node:net";
 const GOOGLEBOT =
   "Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)";
 
+const BROWSER =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 Unpaywall/0.1 (+https://unpaywall.matthew-tran.com)";
+
 export type Result = { html: string; baseUrl: string; method: string };
 
 function isPrivateIp(ip: string): boolean {
@@ -66,6 +69,16 @@ export async function googlebot(url: URL): Promise<Result> {
   return { html, baseUrl: finalUrl, method: "googlebot" };
 }
 
+export async function direct(url: URL): Promise<Result> {
+  const { html, finalUrl } = await get(url.href, {
+    "user-agent": BROWSER,
+    accept: "text/html,application/xhtml+xml",
+    "accept-language": "en-US,en;q=0.9",
+  });
+  if (looksWalled(html)) throw new Error("still walled");
+  return { html, baseUrl: finalUrl, method: "direct" };
+}
+
 export async function archiveToday(url: URL): Promise<Result> {
   const { html } = await get(`https://archive.ph/newest/${url.href}`, { "user-agent": GOOGLEBOT });
   if (looksWalled(html)) throw new Error("archive miss");
@@ -73,23 +86,26 @@ export async function archiveToday(url: URL): Promise<Result> {
 }
 
 export async function wayback(url: URL): Promise<Result> {
-  const meta = await fetch(`https://archive.org/wayback/available?url=${encodeURIComponent(url.href)}`, {
-    signal: AbortSignal.timeout(8000),
-  }).then((r) => r.json());
-  const snap = meta?.archived_snapshots?.closest?.url as string | undefined;
-  if (!snap) throw new Error("no snapshot");
-  const { html } = await get(snap.replace(/^http:/, "https:"), { "user-agent": GOOGLEBOT });
+  const { html } = await get(`https://web.archive.org/web/2/${url.href}`, { "user-agent": BROWSER }, 15000);
   return { html, baseUrl: url.href, method: "wayback" };
 }
 
+const attempt = (name: string, fn: (u: URL) => Promise<Result>, url: URL) =>
+  fn(url).catch((e: Error) => {
+    throw new Error(`${name}: ${e.message}`);
+  });
+
+/** Live fetches race in parallel; archives are the slower fallback. */
 export async function fetchReadable(url: URL): Promise<Result> {
-  const errors: string[] = [];
-  for (const fn of [googlebot, archiveToday, wayback]) {
+  try {
+    return await Promise.any([attempt("googlebot", googlebot, url), attempt("direct", direct, url)]);
+  } catch (live) {
+    const errors = (live as AggregateError).errors.map((e: Error) => e.message);
     try {
-      return await fn(url);
-    } catch (e) {
-      errors.push(`${fn.name}: ${(e as Error).message}`);
+      return await Promise.any([attempt("archive.ph", archiveToday, url), attempt("wayback", wayback, url)]);
+    } catch (arch) {
+      errors.push(...(arch as AggregateError).errors.map((e: Error) => e.message));
+      throw new Error(errors.join(" | "));
     }
   }
-  throw new Error(errors.join(" | "));
 }
