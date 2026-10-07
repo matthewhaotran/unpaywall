@@ -5,7 +5,15 @@ body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,sans-
 main{max-width:40rem;margin:0 auto;padding:18vh 16px 4rem}
 h1{font-size:2.25rem;margin:0 0 .25rem}
 p{color:var(--muted);margin:.25rem 0 1.5rem}
+.tag{font-size:1.1rem}
 form{display:flex;gap:.5rem;flex-wrap:wrap}
 input{flex:1 1 16rem;padding:.8rem 1rem;font:inherit;color:inherit;background:transparent;border:1px solid var(--border);border-radius:.6rem}
 button{padding:.8rem 1.2rem;font:inherit;font-weight:600;color:#fff;background:var(--accent);border:0;border-radius:.6rem;cursor:pointer}
 small{display:block;margin-top:2rem;color:var(--muted)}
+.opt{display:flex;gap:.5rem;align-items:center;margin-top:1rem;color:var(--muted);font-size:.95rem;cursor:pointer}
+.opt input{flex:none;padding:0}
+.about{margin-top:2.5rem;border-top:1px solid var(--border);padding-top:1.5rem}
+.about h2{font-size:1.1rem;margin:0 0 .5rem}
+.about p{margin:.5rem 0;color:var(--muted)}
+.about a{color:var(--accent)}
+.about .fine{font-size:.85rem}
